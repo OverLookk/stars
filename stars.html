@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Star Background</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #000000; /* Start with black background */
+        }
+
+        .star-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .star {
+            position: absolute;
+            background-color: #fff;
+            border-radius: 50%;
+            animation: twinkle 5s infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .controls-container {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .controls {
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            color: white;
+            transition: max-height 0.5s ease, opacity 0.5s ease;
+            max-height: 100%;
+            overflow: hidden;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+            width: 300px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .control-group input[type="range"],
+        .control-group input[type="number"],
+        .control-group input[type="color"] {
+            width: 100%;
+            padding: 5px;
+            border: none;
+            border-radius: 5px;
+            background-color: #333;
+            color: white;
+            outline: none;
+        }
+
+        .control-group input[type="number"] {
+            width: 50px;
+        }
+
+        #minimize-btn {
+            background-color: #4444;
+            color: #fff;
+            border-radius: 5px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: .7em;
+            text-align: center;
+            position: fixed; 
+            top: 10px; 
+            right: 10px; 
+            z-index: 2; 
+        }
+
+        #minimize-btn:focus {
+            outline: none;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="star-container" id="star-container"></div>
+
+    <div class="controls-container">
+        <div class="controls" id="controls-panel">
+            <div class="control-group">
+                <label for="background-color">Background Color</label>
+                <input type="color" id="background-color" value="#000000">
+            </div>
+            <div class="control-group">
+                <label for="star-color">Star Color</label>
+                <input type="color" id="star-color" value="#ffffff">
+            </div>
+            <div class="control-group">
+                <label for="star-count">Star Count</label>
+                <input type="range" id="star-count" min="10" max="300" value="100">
+                <input type="number" id="star-count-number" min="10" max="300" value="100">
+            </div>
+            <div class="control-group">
+                <label for="star-size">Star Size Multiplier</label>
+                <input type="range" id="star-size" min="0.5" max="5" step="0.1" value="1">
+                <input type="number" id="star-size-number" min="0.5" max="5" step="0.1" value="1">
+            </div>
+            <div class="control-group">
+                <label for="star-speed">Star Speed</label>
+                <input type="range" id="star-speed" min="1" max="5" value="2">
+                <input type="number" id="star-speed-number" min="1" max="5" value="2">
+            </div>
+            <div class="control-group">
+                <label for="rainbow-toggle">Rainbow Effect</label>
+                <input type="checkbox" id="rainbow-toggle">
+            </div>
+            <div class="control-group">
+                <label for="color-variation-toggle">Color Variation</label>
+                <input type="checkbox" id="color-variation-toggle">
+            </div>
+            <div class="control-group">
+                <label for="color-variation-amount">Color Variation Amount</label>
+                <input type="range" id="color-variation-amount" min="0" max="50" value="20" disabled>
+                <input type="number" id="color-variation-number" min="0" max="50" value="20" disabled>
+            </div>
+        </div>
+    </div>
+
+    <button id="minimize-btn">[-]</button>
+
+    <script>
+        const starContainer = document.getElementById('star-container');
+        const body = document.body;
+        let stars = [];
+        let velocities = [];
+        let isRainbow = false;
+        let colorVariation = false;
+        let colorVariationAmount = 20;
+
+        function randomColorSimilarTo(baseColor, variation) {
+            const randomFactor = () => Math.floor(Math.random() * (2 * variation)) - variation; // Varies by ±variation in each RGB channel
+            let r = parseInt(baseColor.substring(1, 3), 16) + randomFactor();
+            let g = parseInt(baseColor.substring(3, 5), 16) + randomFactor();
+            let b = parseInt(baseColor.substring(5, 7), 16) + randomFactor();
+            r = Math.min(255, Math.max(0, r));
+            g = Math.min(255, Math.max(0, g));
+            b = Math.min(255, Math.max(0, b));
+            return `rgb(${r},${g},${b})`;
+        }
+
+        function createStar(sizeMultiplier, color) {
+            const star = document.createElement('div');
+            star.className = 'star';
+            const baseSize = Math.random() * 3 + 1;
+            const size = baseSize * sizeMultiplier;
+            star.style.width = `${size}px`;
+            star.style.height = `${size}px`;
+            star.style.top = `${Math.random() * 100}%`;
+            star.style.left = `${Math.random() * 100}%`;
+            star.style.animationDuration = `${Math.random() * 3 + 2}s`;
+
+            if (isRainbow) {
+                star.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 50%)`;
+            } else if (colorVariation) {
+                star.style.backgroundColor = randomColorSimilarTo(color, colorVariationAmount);
+            } else {
+                star.style.backgroundColor = color;
+            }
+
+            // Light color now matches the star's color by default
+            star.style.boxShadow = `0 0 10px ${star.style.backgroundColor}, 0 0 20px ${star.style.backgroundColor}`;
+
+            starContainer.appendChild(star);
+            return star;
+        }
+
+        function generateStars(count, sizeMultiplier, color) {
+            starContainer.innerHTML = ''; // Clear existing stars
+            stars = [];
+            velocities = [];
+
+            for (let i = 0; i < count; i++) {
+                stars.push(createStar(sizeMultiplier, color));
+                velocities.push({ x: (Math.random() - 0.5) * 2, y: (Math.random() - 0.5) * 2 });
+            }
+        }
+
+        let velocityX = 0;
+        let velocityY = 0;
+        let lastMouseX = 0;
+        let lastMouseY = 0;
+        let starSpeed = 2;
+
+        document.addEventListener('mousemove', (e) => {
+            velocityX = e.clientX - lastMouseX;
+            velocityY = e.clientY - lastMouseY;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        });
+
+        function moveStars() {
+            stars.forEach((star, index) => {
+                const rect = star.getBoundingClientRect();
+                let top = rect.top + velocities[index].y * starSpeed + velocityY * 0.05;
+                let left = rect.left + velocities[index].x * starSpeed + velocityX * 0.05;
+
+                if (top < 0) top = window.innerHeight;
+                if (top > window.innerHeight) top = 0;
+                if (left < 0) left = window.innerWidth;
+                if (left > window.innerWidth) left = 0;
+
+                star.style.top = `${top}px`;
+                star.style.left = `${left}px`;
+            });
+
+            requestAnimationFrame(moveStars);
+        }
+
+        moveStars();
+
+        // Initial star setup
+        const starCountSlider = document.getElementById('star-count');
+        const starCountNumber = document.getElementById('star-count-number');
+        const starSizeSlider = document.getElementById('star-size');
+        const starSizeNumber = document.getElementById('star-size-number');
+        const starSpeedSlider = document.getElementById('star-speed');
+        const starSpeedNumber = document.getElementById('star-speed-number');
+        const starColorInput = document.getElementById('star-color');
+        const backgroundColorInput = document.getElementById('background-color');
+        const rainbowToggle = document.getElementById('rainbow-toggle');
+        const colorVariationToggle = document.getElementById('color-variation-toggle');
+        const colorVariationAmountSlider = document.getElementById('color-variation-amount');
+        const colorVariationNumber = document.getElementById('color-variation-number');
+        const controlsPanel = document.getElementById('controls-panel');
+        const minimizeBtn = document.getElementById('minimize-btn');
+
+        generateStars(starCountSlider.value, starSizeSlider.value, starColorInput.value);
+
+        // Synchronize sliders and number inputs
+        starCountSlider.addEventListener('input', () => {
+            starCountNumber.value = starCountSlider.value;
+            generateStars(starCountSlider.value, starSizeSlider.value, starColorInput.value);
+        });
+
+        starCountNumber.addEventListener('input', () => {
+            starCountSlider.value = starCountNumber.value;
+            generateStars(starCountSlider.value, starSizeSlider.value, starColorInput.value);
+        });
+
+        starSizeSlider.addEventListener('input', () => {
+            starSizeNumber.value = starSizeSlider.value;
+            generateStars(starCountSlider.value, starSizeSlider.value, starColorInput.value);
+        });
+
+        starSizeNumber.addEventListener('input', () => {
+            starSizeSlider.value = starSizeNumber.value;
+            generateStars(starCountSlider.value, starSizeSlider.value, starColorInput.value);
+        });
+
+        starSpeedSlider.addEventListener('input', () => {
+            starSpeedNumber.value = starSpeedSlider.value;
+            starSpeed = starSpeedSlider.value;
+        });
+
+        starSpeedNumber.addEventListener('input', () => {
+            starSpeedSlider.value = starSpeedNumber.value;
+            starSpeed = starSpeedNumber.value;
+        });
+
+        starColorInput.addEventListener('input', () => {
+            generateStars(starCountSlider.value, starSizeSlider.value, starColorInput.value);
+        });
+
+        backgroundColorInput.addEventListener('input', () => {
+            body.style.backgroundColor = backgroundColorInput.value;
+        });
+
+        rainbowToggle.addEventListener('input', () => {
+            isRainbow = rainbowToggle.checked;
+            generateStars(starCountSlider.value, starSizeSlider.value, starColorInput.value);
+        });
+
+        colorVariationToggle.addEventListener('input', () => {
+            colorVariation = colorVariationToggle.checked;
+            colorVariationAmountSlider.disabled = !colorVariation;
+            colorVariationNumber.disabled = !colorVariation;
+            generateStars(starCountSlider.value, starSizeSlider.value, starColorInput.value);
+        });
+
+        colorVariationAmountSlider.addEventListener('input', () => {
+            colorVariationAmount = colorVariationAmountSlider.value;
+            colorVariationNumber.value = colorVariationAmountSlider.value;
+            generateStars(starCountSlider.value, starSizeSlider.value, starColorInput.value);
+        });
+
+        colorVariationNumber.addEventListener('input', () => {
+            colorVariationAmount = colorVariationNumber.value;
+            colorVariationAmountSlider.value = colorVariationNumber.value;
+            generateStars(starCountSlider.value, starSizeSlider.value, starColorInput.value);
+        });
+
+        // Minimize button toggle (only hides the panel, button remains visible)
+        minimizeBtn.addEventListener('click', () => {
+            if (controlsPanel.classList.contains('hidden')) {
+                controlsPanel.classList.remove('hidden');
+                minimizeBtn.textContent = '[-]';
+            } else {
+                controlsPanel.classList.add('hidden');
+                minimizeBtn.textContent = '[+]';
+            }
+        });
+    </script>
+</body>
+</html>
